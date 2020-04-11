@@ -1,0 +1,84 @@
+---
+title: "piyango"
+author: "yk"
+date: "10 04 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Piyango oyunlarından Sayısal Loto incelemesi
+
+Sayısal Loto oyunu Milli Piyango idaresi tarafından önceleri haftada bir, şimdilerde haftada iki defa gerçekleştirilen bir oyundur. 1'den 49'a kadar (1 ve 49 dahil) sayılardan 6 adet rakamı tutturan en büyük ikramiyeyi, 5, 4 ve 3 tutturanların daha az ödül alabildiği bir şans oyunudur. Her 6 rakam grubu için 1.5 TL ödeme yapılarak umut aradığımız oyunda oynama kısıtı yoktur.
+Bu oyun kurgusu 49 rakam içinden 6 rakamı tahmin etme üzerine kuruludur. Bu oyuna ait 1996-2020 yılları arasındaki 1312 adet çekilişi içeren veri incelemesi yapılacaktır.
+
+```{r loto}
+loto <- read.csv("C:/Users/ykoca/Desktop/R_sample/loto.csv", sep=";", stringsAsFactors = F)
+loto$Tarih <- as.Date(loto$Tarih, format = "%d.%m.%Y")
+head(loto)
+```
+
+## Çıkan sayı istatistiği
+
+Öncelikle çıkan sayı istatistikleri irdeleyeceğiz.
+
+```{r sayilar}
+sayihane <- loto[,3:8]
+sayilar <- split(sayihane, seq(nrow(sayihane)))
+unlist(sayilar) -> v
+sayim <- aggregate(data.frame(count = v),
+          list(numbers = v),
+          length)
+plot(sayim, type="o", xaxt="n")
+axis(side=1, at=(0:10)*5, labels=c(seq(0,50,5)))
+title("1996-2020 Yılları arasında çekilişte çıkan sayıların adetleri")
+```
+
+Bu kadar uzun zaman içinde bazı sayıların daha fazla çıktığı bazı sayıların ise daha az çıktığı görülmektedir. Bu durum bize sayıların ağırlığı olduğu fikrini vermektedir. Diğer bir deyişle her sayının farklı bir çıkma olasılığı olduğundan sözedebiliriz. Yani her sayının ortaya çıkma olasılığı kesinlikle 1/49 değil. Her sayı için eldeki verilere göre olasılık ağırlığı hesaplayabiliriz.
+```{r}
+sayim_w <- cbind(sayim, w = prop.table(sayim)[,2])
+(olasilik = sayim_w[,c(1,3)])
+```
+
+## Sayı tahmin et
+
+Herbir sayının ağırlığını bildiğimize göre daha isabetli tahminler yapabiliriz. Bilgisayar sizin için en çok çıkan sayı ağırlığını gözeterek 6 adet sayı tahmin edecek. Bu kodu birkaç defa çalıştırarak bir kolon doldurmak mümkün.
+
+```{r}
+hadi <- function(){
+  c <- sample(olasilik$numbers, 6, prob = olasilik$w)
+  cat("Çektiğin Şanslı 6 Sayı:",c[order(c)])
+  cat("\nİyi şanslar")
+}
+
+hadi()
+```
+
+## Ne kadar şanslıymışız bakalım
+
+Tahmin sayıları veya yeni başka sayılar ile daha önce çıkan sayıların karşılaştırmasını yapabilirsin. Şanslı numaralarını 24 yıllık rakamlarla kıyaslama yaparak milyoner olmaya ne kadar yaklaştığını görebilirsin.
+
+```{r}
+benimki <- c(20,23,32,38,41,47)
+
+ggplot(sayim)+ geom_line(data = sayim, aes(x = numbers, y = count, group = 1L), stat = "identity") +
+  geom_label(data = sayim %>% filter(sayim$numbers %in% benimki),
+             aes(x = numbers, y = count, label = numbers), nudge_x = 0.25, nudge_y = 0.25) + 
+  labs(title = "Çıkan sayılar ve senin şanslı sayıların")
+```
+
+Bu durumu sayıların ortaya çıkma olasılığı ölçeğinde de görebilirsin.
+```{r}
+benimki <- c(20,23,32,38,41,47)
+
+ggplot(sayim_w)+ geom_line(data = sayim_w, aes(x = numbers, y = w, group = 1L), stat = "identity") +
+  geom_label(data=sayim_w %>% filter(sayim_w$numbers %in% benimki),
+             aes(x = numbers, y = w, label = numbers)) +
+    labs(title = "Çıkan sayıların Olasılıkları ve senin şanslı sayıların")
+#         subtitle = paste0("Toplam olasılık :", sum(data$w)))
+```
+
+
